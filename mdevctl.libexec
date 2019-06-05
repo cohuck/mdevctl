@@ -54,6 +54,19 @@ wait_for_supported_types () {
     fi
 }
 
+# configure vfio-ap devices <config entry> <matrix attribute>
+configure_ap_devices() {
+    list="`echo "${config[$1]}" | sed 's/,/ /'`"
+    [ -z "$list" ] && return
+    for a in $list; do
+        echo "$a" > "$supported_types/${config[mdev_type]}/devices/$uuid/$2"
+        if [ $? -ne 0 ]; then
+            echo "Error writing '$a' to '$uuid/$2'" >&2
+            exit 1
+        fi
+    done
+}
+
 case ${1} in
     start-mdev|stop-mdev)
         if [ $# -ne 2 ]; then
@@ -148,6 +161,18 @@ case ${cmd} in
             echo "Error creating mdev type ${config[mdev_type]} on $parent" >&2
             exit 1
         fi
+
+        # some types may specify additional config data
+        case ${config[mdev_type]} in
+            vfio_ap-passthrough)
+                configure_ap_devices ap_adapters assign_adapter
+                configure_ap_devices ap_domains assign_domain
+                configure_ap_devices ap_control_domains assign_control_domain
+                # TODO: is assigning idempotent? Should we unwind on error?
+                ;;
+            *)
+                ;;
+        esac
         ;;
 
     add-mdev)
